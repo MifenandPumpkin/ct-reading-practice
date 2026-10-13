@@ -55,13 +55,14 @@ function toast(t){const e=$("toast");e.textContent=t;e.style.display="block";cle
 const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const T=r=>'<table>'+r.map((x,i)=>'<tr>'+x.map(v=>i?'<td>'+esc(v)+'</td>':'<th>'+esc(v)+'</th>').join('')+'</tr>').join('')+'</table>';
 let D=null;
-document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on",x===b));["ov","gr","ex","up"].forEach(t=>$("t-"+t).classList.toggle("hide",t!==b.dataset.t));if(b.dataset.t==="gr")slist()});
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{TAB=b.dataset.t;document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on",x===b));if(!D)return;["ov","gr","ex","up"].forEach(t=>$("t-"+t).classList.toggle("hide",t!==TAB));if(TAB==="gr")slist()});
 async function load(){try{D=await api("tData",K)}catch(e){$("login").classList.remove("hide");$("t-ov").classList.add("hide");if(K)toast(e.message);return false}
   $("login").classList.add("hide");const ov=D.overview.slice(1);
   $("kp").innerHTML=`<span class="k">題組<b>${D.sets}</b></span><span class="k">已領取<b>${D.assign.length-1}</b></span><span class="k">作答中<b>${ov.filter(r=>r[7]==='作答中').length}</b></span><span class="k">已交件<b>${ov.filter(r=>r[7]==='已完成').length}</b></span><span class="k">已評分<b>${Math.max(0,(D.grades||[]).length-1)}</b></span>`;
-  $("ov").innerHTML=T(D.overview);$("rp").innerHTML=T(D.report);$("gd").innerHTML=(D.grades||[]).length?T(D.grades):'<span class="mu">還沒有評分</span>';$("sh").href=D.sheetUrl;$("upd").textContent="更新 "+new Date().toLocaleTimeString().slice(0,5);return true}
+  $("ov").innerHTML=T(D.overview);$("rp").innerHTML=T(D.report);$("gd").innerHTML=(D.grades||[]).length?T(D.grades):'<span class="mu">還沒有評分</span>';$("sh").href=D.sheetUrl;$("upd").textContent="更新 "+new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});return true}
 $("rf").onclick=load;$("kgo").onclick=()=>{K=$("kin").value.trim();try{localStorage.setItem("ct-teacher-k",K)}catch(e){};init()};
-async function init(){if(!K){$("login").classList.remove("hide");return}if(await load()){$("t-ov").classList.remove("hide");setInterval(load,60000)}}
+let TAB="ov";
+async function init(){if(!K){$("login").classList.remove("hide");return}if(await load()){$("t-"+TAB).classList.remove("hide");if(TAB==="gr")slist();setInterval(load,60000)}}
 // ---------- 評分 ----------
 const TY={wrongno:"號碼錯",split:"切成兩塊",merged:"黏成一顆",notooth:"不是牙",outline:"輪廓不準"};
 function desc(f,e){if(e.type==="wrongno")return f+" 號 → 學生說應是 "+e.correct+" 號";if(e.type==="split")return f+" 號：和 "+e.with+" 是同一顆"+(e.correct?"（＝"+e.correct+"）":"");if(e.type==="merged")return f+" 號：兩顆黏一起"+(e.correct?"（"+e.correct+"）":"");return f+" 號："+TY[e.type]}

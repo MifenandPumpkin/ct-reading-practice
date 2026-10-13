@@ -11,7 +11,7 @@ function local(){try{localStorage.setItem(LK(),JSON.stringify(st))}catch(e){}}
 function markDirty(){dirty=true;local();clearTimeout(markDirty._t);markDirty._t=setTimeout(()=>flush(false),2500)}
 let pend=false;
 async function flush(final){if(!ME)return; if(saving&&!final){pend=true;return} saving=true;
-  try{const r=await call("save",ME.sid,st,!!final);dirty=false;document.getElementById("saved").textContent="已存到雲端 "+new Date().toLocaleTimeString().slice(0,5);return r}
+  try{const r=await call("save",ME.sid,st,!!final);dirty=false;document.getElementById("saved").textContent="已存到雲端 "+new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});return r}
   catch(e){document.getElementById("saved").textContent="⚠ 雲端存檔失敗（已先存在這台電腦）";if(final)throw e}
   finally{saving=false;if(pend){pend=false;setTimeout(()=>flush(false),50)}}}
 window.addEventListener("beforeunload",e=>{if(dirty){flush(false);e.preventDefault();e.returnValue=""}});
