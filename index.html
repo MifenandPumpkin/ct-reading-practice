@@ -1,0 +1,40 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CT 牙齒判讀練習</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link rel="stylesheet" href="exam.css">
+<script src="config.js"></script><script src="api.js"></script>
+</head><body>
+
+<div class="top"><h1>CT 牙齒判讀練習</h1><div class="dots" id="dots"></div><span class="sp"></span><span class="mu" id="who"></span><span class="mu" id="saved"></span>
+<button class="btn hide" id="tmp">暫存</button><button class="btn pri hide" id="pdf">全部完成：下載結果 PDF</button></div>
+<main>
+<section id="login" class="card">
+  <h2 style="margin-top:0">開始前</h2>
+  <div class="help"><b>這是什麼：</b>AI 讀了一份牙科 CBCT，標出每顆牙的號碼。請你找出 AI 標錯的地方。你的答案會用來訓練 AI，老師也會用來評分。
+  <ul><li>① 先填學號等資料。<b>關掉瀏覽器也沒關係</b>，下次用同一個學號和 email 登入就會回到你的題目和進度。</li>
+  <li>② 每例：哪顆牙號錯就點它的號碼框選錯在哪；再看黃線（骨頭外框）、紅線（神經管）準不準。</li>
+  <li>③ 每次操作都會自動存到老師的雲端資料夾，也可以隨時按「暫存」。</li>
+  <li>④ 全部填完，右上角會出現「下載結果 PDF」，下載後交給老師。</li></ul>
+  <p class="mu">完整說明書（有截圖）：<a href="manual-student.html" target="_blank">打開學生說明書</a></p></div>
+  <div class="form">
+    <label>學號 *</label><input id="sid" autocomplete="off" placeholder="例如 B1234567">
+    <label>姓名</label><input id="sname" placeholder="第一次登入必填">
+    <label>學校 email *</label><input id="email" placeholder="每次登入都要填（用來確認是你）">
+    <label>年級</label><input id="grade" placeholder="例如 大三">
+  </div>
+  <p class="mu">已經登入過的人：填學號和學校 email 就可以繼續。</p>
+  <button class="btn pri" id="go">開始／繼續</button>
+</section>
+<div id="case"></div>
+</main>
+<div class="foot hide" id="foot"><button class="btn" id="prev">← 上一例</button><button class="btn okline" id="allok">全部正確，下一例</button><button class="btn pri" id="next">這例填好了，下一例 →</button></div>
+<div class="toast" id="toast"></div>
+<script>
+let TOK="";
+window.BACKEND={
+  register: async info => { const r = await api("register", info); TOK = r.tok; return r; },
+  getCase: (sid, id) => api("getCase", sid, TOK, id),
+  save: (sid, st, f) => api("save", sid, TOK, st, f)
+};
+</script>
+<script src="exam.js"></script></body></html>

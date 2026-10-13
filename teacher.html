@@ -1,0 +1,112 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CT 判讀練習｜老師總覽與評分</title>
+<script src="config.js"></script><script src="api.js"></script>
+<style>
+:root{--bg:#f6f8fa;--pan:#fff;--ln:#d0d7de;--tx:#1f2328;--mu:#656d76;--ok:#1a7f37;--bad:#cf222e;--acc:#0969da}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 "Microsoft JhengHei","Noto Sans TC",system-ui,sans-serif}
+header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--ln);padding:10px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+header h1{font-size:17px;margin:0 12px 0 0}.tab{font:inherit;border:1px solid var(--ln);background:#fff;border-radius:6px;padding:6px 12px;cursor:pointer}.tab.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.sp{flex:1}.mu{color:var(--mu);font-size:13px}main{max-width:1280px;margin:0 auto;padding:12px 16px 60px}
+.card{background:var(--pan);border:1px solid var(--ln);border-radius:8px;padding:14px;margin:10px 0}
+.k{display:inline-block;margin:0 10px 8px 0;padding:8px 14px;border:1px solid var(--ln);border-radius:8px;background:#fff}.k b{font-size:20px;display:block}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid var(--ln);padding:4px 6px;text-align:left;vertical-align:top}th{background:#f6f8fa;position:sticky;top:0}
+.wrap{overflow:auto;max-height:55vh}.btn{font:inherit;border:1px solid var(--ln);background:#fff;border-radius:6px;padding:6px 12px;cursor:pointer}.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}.btn.warn{border-color:var(--bad);color:var(--bad)}
+.grid{display:grid;grid-template-columns:260px 1fr;gap:12px}.list{max-height:75vh;overflow:auto}.stu{padding:6px 8px;border:1px solid var(--ln);border-radius:6px;margin:4px 0;cursor:pointer;background:#fff}.stu.on{border-color:var(--acc);box-shadow:0 0 0 2px #0969da33}
+.pano{position:relative;background:#000;border-radius:6px;overflow:hidden;max-width:900px}.pano img{width:100%;display:block}.pin{position:absolute;transform:translate(-50%,-50%);border:2px solid #ff4d4d;border-radius:5px;width:3.6%;min-width:26px;height:5.4%;min-height:20px;background:#ff3c3c33}
+.it{display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px dashed var(--ln)}.it .t{flex:1}.yn button{font:inherit;border:1px solid var(--ln);background:#fff;border-radius:6px;padding:3px 10px;cursor:pointer}.yn .on.y{background:var(--ok);color:#fff;border-color:var(--ok)}.yn .on.n{background:var(--bad);color:#fff;border-color:var(--bad)}
+.ctab{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}input.sc{width:70px;font:inherit;padding:4px}textarea{width:100%;font:inherit;padding:6px;border:1px solid var(--ln);border-radius:6px}
+.toast{position:fixed;left:50%;top:64px;transform:translateX(-50%);background:#fff8c5;border:1px solid #d4a72c;padding:8px 14px;border-radius:8px;display:none;z-index:50}
+.hide{display:none!important}.v3{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:6px;margin-top:6px}.v3 img{width:100%;background:#0e1116;border-radius:4px}
+@media(max-width:800px){.grid{grid-template-columns:1fr}.v3{grid-template-columns:1fr}}
+</style></head><body>
+<header><h1>CT 判讀練習｜老師</h1>
+<button class="tab on" data-t="ov">總覽</button><button class="tab" data-t="gr">評分與修改</button><button class="tab" data-t="ex">下載結果</button><button class="tab" data-t="up">上傳題目</button>
+<span class="sp"></span><a class="btn" href="manual-teacher.html" target="_blank">老師說明書</a><span class="mu" id="upd"></span></header>
+<main>
+<section id="login" class="card hide"><h3 style="margin-top:0">輸入老師碼</h3><p class="mu">老師總覽連結最後 <code>k=</code> 後面那一串。輸入一次後這台電腦會記住。</p>
+<input id="kin" style="font:inherit;padding:6px;width:260px"> <button class="btn pri" id="kgo">打開</button></section>
+
+<section id="t-ov" class="hide">
+<div id="kp"></div>
+<div class="card"><b>每位學生</b><div class="wrap" id="ov"></div></div>
+<div class="card"><b>總報告（每例彙整：學生標了哪些錯）</b><div class="wrap" id="rp"></div></div>
+<div class="card"><b>評分紀錄</b><div class="wrap" id="gd"></div></div>
+<p><a id="sh" target="_blank">開啟試算表「總覽與總報告」（要用老師的 Google 帳號）</a>　<button class="btn" id="rf">重新整理</button>　每 60 秒自動更新</p>
+</section>
+
+<section id="t-gr" class="hide"><div class="grid">
+<div class="card list"><b>學生</b><p class="mu">點一位學生開始評分</p><div id="slist"></div></div>
+<div class="card" id="gpane"><p class="mu">← 先選一位學生</p></div></div></section>
+
+<section id="t-ex" class="hide"><div class="card"><h3 style="margin-top:0">下載全部結果（給 Claude 分析）</h3>
+<p>按下面按鈕會下載一個 <code>CT學生標註結果-日期.json</code> 到你電腦的「下載」資料夾（C:\Users\Jethro\Downloads）。<br>下載後跟 Claude 說「<b>學生結果下載好了</b>」，Claude 會自己去下載資料夾拿、轉進訓練資料、做分析報告。</p>
+<button class="btn pri" id="exb">下載全部結果</button> <span class="mu" id="exm"></span></div></section>
+
+<section id="t-up" class="hide"><div class="card"><h3 style="margin-top:0">上傳題目</h3>
+<p class="mu">一般由 Claude 準備好再上傳。選 Claude 打包好的資料夾裡的 <code>cases\S-xxx.json</code>（可一次多選）和 <code>sets.json</code>。上傳前 Claude 已做過個資檢查（upload_list.json）。</p>
+<input type="file" id="upf" multiple accept=".json"> <button class="btn pri" id="upb">上傳</button>
+<div id="upm" class="mu" style="margin-top:8px;white-space:pre-line"></div>
+<hr><p class="mu">正式開始前清空測試資料：</p><button class="btn warn" id="rst1">清空所有作答與分組（題目保留）</button></div></section>
+</main><div class="toast" id="toast"></div>
+<script>
+const $=id=>document.getElementById(id);const qs=new URLSearchParams(location.search);let K=qs.get("k")||"";
+try{if(K)localStorage.setItem("ct-teacher-k",K);else K=localStorage.getItem("ct-teacher-k")||""}catch(e){}
+function toast(t){const e=$("toast");e.textContent=t;e.style.display="block";clearTimeout(e._t);e._t=setTimeout(()=>e.style.display="none",3500)}
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const T=r=>'<table>'+r.map((x,i)=>'<tr>'+x.map(v=>i?'<td>'+esc(v)+'</td>':'<th>'+esc(v)+'</th>').join('')+'</tr>').join('')+'</table>';
+let D=null;
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on",x===b));["ov","gr","ex","up"].forEach(t=>$("t-"+t).classList.toggle("hide",t!==b.dataset.t));if(b.dataset.t==="gr")slist()});
+async function load(){try{D=await api("tData",K)}catch(e){$("login").classList.remove("hide");$("t-ov").classList.add("hide");if(K)toast(e.message);return false}
+  $("login").classList.add("hide");const ov=D.overview.slice(1);
+  $("kp").innerHTML=`<span class="k">題組<b>${D.sets}</b></span><span class="k">已領取<b>${D.assign.length-1}</b></span><span class="k">作答中<b>${ov.filter(r=>r[7]==='作答中').length}</b></span><span class="k">已交件<b>${ov.filter(r=>r[7]==='已完成').length}</b></span><span class="k">已評分<b>${Math.max(0,(D.grades||[]).length-1)}</b></span>`;
+  $("ov").innerHTML=T(D.overview);$("rp").innerHTML=T(D.report);$("gd").innerHTML=(D.grades||[]).length?T(D.grades):'<span class="mu">還沒有評分</span>';$("sh").href=D.sheetUrl;$("upd").textContent="更新 "+new Date().toLocaleTimeString().slice(0,5);return true}
+$("rf").onclick=load;$("kgo").onclick=()=>{K=$("kin").value.trim();try{localStorage.setItem("ct-teacher-k",K)}catch(e){};init()};
+async function init(){if(!K){$("login").classList.remove("hide");return}if(await load()){$("t-ov").classList.remove("hide");setInterval(load,60000)}}
+// ---------- 評分 ----------
+const TY={wrongno:"號碼錯",split:"切成兩塊",merged:"黏成一顆",notooth:"不是牙",outline:"輪廓不準"};
+function desc(f,e){if(e.type==="wrongno")return f+" 號 → 學生說應是 "+e.correct+" 號";if(e.type==="split")return f+" 號：和 "+e.with+" 是同一顆"+(e.correct?"（＝"+e.correct+"）":"");if(e.type==="merged")return f+" 號：兩顆黏一起"+(e.correct?"（"+e.correct+"）":"");return f+" 號："+TY[e.type]}
+function slist(){if(!D)return;const ov=D.overview.slice(1);const gm={};(D.grades||[]).slice(1).forEach(g=>gm[g[0]]=g[3]);
+  $("slist").innerHTML=ov.length?ov.map(r=>`<div class="stu" data-s="${esc(r[0])}"><b>${esc(r[0])}</b> ${esc(r[1])}<br><span class="mu">第 ${esc(r[4])} 組｜${esc(r[7])}｜${esc(r[5])}/${esc(r[6])} 例${gm[r[0]]!==undefined?'｜總分 '+esc(gm[r[0]]):''}</span></div>`).join(""):'<p class="mu">還沒有學生</p>';
+  document.querySelectorAll(".stu").forEach(e=>e.onclick=()=>{document.querySelectorAll(".stu").forEach(x=>x.classList.toggle("on",x===e));openStu(e.dataset.s)})}
+let R=null,G=null,CUR=0,CC={};
+async function openStu(sid){$("gpane").innerHTML='讀取中…';try{R=await api("tResult",K,sid)}catch(e){$("gpane").innerHTML=esc(e.message);return}
+  if(!R){$("gpane").innerHTML='這位學生還沒存過答案';return}
+  const set=(await api("tSets",K)).sets.find(s=>String(s.id)===String(R.set));R.cases=set?set.cases:Object.keys(R.state||{});
+  G=R.review?JSON.parse(JSON.stringify(R.review)):{cases:{},total:"",comment:""};CUR=0;renderG()}
+function items(st){const it=[];Object.entries(st.errors||{}).forEach(([f,e])=>it.push(["e:"+f,"學生標錯："+desc(f,e)]));(st.missing||[]).forEach(m=>it.push(["m:"+m,"學生說 AI 漏掉 "+m+" 號"]));
+  if(!it.length&&st.done)it.push(["allok","學生說這例 AI 牙號全部正確"]);
+  if(st.bone)it.push(["bone","骨頭外框（黃線）：學生說「"+(st.bone==="ok"?"準":"不準")+"」"]);if(st.canal)it.push(["canal","神經管（紅線）：學生說「"+(st.canal==="ok"?"準":"不準")+"」"]);return it}
+function suggest(c){const st=(R.state||{})[c]||{};const it=items(st);const g=G.cases[c]||{};const v=it.map(([k])=>g.items&&g.items[k]);if(!it.length||v.some(x=>x===undefined))return "";return Math.round(100*v.filter(Boolean).length/it.length)}
+async function renderG(){const c=R.cases[CUR];const st=(R.state||{})[c]||{};G.cases[c]=G.cases[c]||{items:{},score:"",comment:""};const g=G.cases[c];
+  if(!CC[c]){$("gpane").innerHTML='讀取病例…';try{CC[c]=await api("tCase",K,c)}catch(e){$("gpane").innerHTML=esc(e.message);return}}const d=CC[c];
+  const pins=Object.keys(st.errors||{}).map(f=>{const l=d.labels.find(x=>String(x.fdi)===String(f));return l?`<span class="pin" style="left:${l.x/d.size[0]*100}%;top:${l.y/d.size[1]*100}%"></span>`:""}).join("");
+  const it=items(st);
+  $("gpane").innerHTML=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="font-size:16px">${esc(R.sid)} ${esc(R.name)}</b><span class="mu">${esc(R.email)}｜${esc(R.grade)}｜第 ${esc(R.set)} 組｜${R.final?'已交件（驗證碼 '+esc(R.verify)+'）':'未交件'}</span><span class="sp"></span>
+  <button class="btn warn" id="unl">退回讓學生修改</button></div>
+  <div class="ctab">${R.cases.map((x,i)=>`<button class="btn ${i===CUR?'pri':''}" data-i="${i}">第 ${i+1} 例 ${esc(x)}${G.cases[x]&&G.cases[x].score!==''&&G.cases[x].score!=null?'｜'+G.cases[x].score+' 分':''}</button>`).join("")}</div>
+  <div class="mu">${st.done?'學生已填完這例':'<b style="color:#cf222e">學生還沒填完這例</b>'}　AI 說明：${esc(d.ai_note||"")}</div>
+  <div class="pano">${'<img src="data:image/png;base64,'+d.pano+'">'}${pins}</div>
+  <div class="v3"><img src="data:image/png;base64,${d.views.right}"><img src="data:image/png;base64,${d.views.front}"><img src="data:image/png;base64,${d.views.left}"></div>
+  <h4>學生的判斷　→　你判斷對不對</h4>${it.length?it.map(([k,t])=>`<div class="it"><span class="t">${esc(t)}</span><span class="yn" data-k="${k}"><button class="y ${g.items[k]===true?'on':''}">對</button> <button class="n ${g.items[k]===false?'on':''}">錯</button></span></div>`).join(""):'<p class="mu">學生沒有作答</p>'}
+  ${st.note?'<p class="mu">學生補充：'+esc(st.note)+'</p>':''}
+  <p>這例分數 <input class="sc" id="sc" value="${esc(g.score)}" placeholder="0–100"> <span class="mu">（全部打完對／錯會自動算：對的項目 ÷ 全部項目；可以直接改）</span></p>
+  <p>這例評語（學生漏掉的錯、要加強的地方）<textarea id="cm" rows="2">${esc(g.comment)}</textarea></p>
+  <hr><p>總分 <input class="sc" id="tot" value="${esc(G.total)}"> <span class="mu">（預設＝各例平均，可改）</span>　總評語 <textarea id="tcm" rows="2">${esc(G.comment)}</textarea></p>
+  <button class="btn pri" id="svg">儲存評分</button> <span class="mu">${G.at?'上次儲存 '+new Date(G.at).toLocaleString():''}</span>`;
+  document.querySelectorAll(".ctab button").forEach(b=>b.onclick=()=>{keep();CUR=+b.dataset.i;renderG()});
+  document.querySelectorAll(".yn").forEach(y=>y.querySelectorAll("button").forEach(b=>b.onclick=()=>{g.items[y.dataset.k]=b.classList.contains("y");const s=suggest(c);if(s!=="")g.score=s;keep(true);renderG()}));
+  $("svg").onclick=saveG;$("unl").onclick=async()=>{if(!confirm("退回後學生可以再修改答案、重新交件。確定？"))return;try{await api("tUnlock",K,R.sid);toast("已退回，學生重新登入就能改");R.final=false;renderG()}catch(e){toast(e.message)}}}
+function avg(){const v=R.cases.map(c=>G.cases[c]&&G.cases[c].score).filter(x=>x!==""&&x!=null&&!isNaN(+x)).map(Number);return v.length===R.cases.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):""}
+function keep(fromToggle){const c=R.cases[CUR];const g=G.cases[c];if(!fromToggle&&$("sc"))g.score=$("sc").value.trim()===""?"":Number($("sc").value);if($("cm"))g.comment=$("cm").value;if($("tcm"))G.comment=$("tcm").value;
+  const a=avg();if($("tot")&&$("tot").value.trim()!==""&&!fromToggle)G.total=Number($("tot").value);else if(a!=="")G.total=a}
+async function saveG(){keep();try{const r=await api("tGrade",K,R.sid,G);G.at=r.at;toast("已儲存 "+R.sid+" 的評分");load();renderG()}catch(e){toast(e.message)}}
+// ---------- 匯出 ----------
+$("exb").onclick=async()=>{$("exm").textContent="準備中…";try{const d=await api("tExport",K);const b=new Blob([JSON.stringify(d,null,1)],{type:"application/json"});const a=document.createElement("a");const t=new Date();
+  a.download="CT學生標註結果-"+t.getFullYear()+String(t.getMonth()+1).padStart(2,"0")+String(t.getDate()).padStart(2,"0")+"-"+String(t.getHours()).padStart(2,"0")+String(t.getMinutes()).padStart(2,"0")+".json";a.href=URL.createObjectURL(b);a.click();$("exm").textContent="已下載（"+d.results.length+" 位學生）。跟 Claude 說「學生結果下載好了」"}catch(e){$("exm").textContent=e.message}};
+// ---------- 上傳 ----------
+$("upb").onclick=async()=>{const fs=[...$("upf").files];if(!fs.length){toast("先選檔案");return}const m=$("upm");m.textContent="";let ok=0;
+  for(const f of fs){try{const j=JSON.parse(await f.text());if(j.sets){await api("tPutSets",K,j);m.textContent+="✔ sets.json（"+j.sets.length+" 組）\n"}else{const id=j.code||f.name.replace(/\.json$/,"");await api("tPutCase",K,id,j);m.textContent+="✔ "+id+"\n"}ok++}catch(e){m.textContent+="✘ "+f.name+"："+e.message+"\n"}}
+  m.textContent+="完成 "+ok+" / "+fs.length;load()};
+$("rst1").onclick=async()=>{if(!confirm("會清空所有學生的作答、分組、評分紀錄（題目保留）。確定？"))return;try{await api("tReset",K,"");toast("已清空");load()}catch(e){toast(e.message)}};
+init();
+</script></body></html>

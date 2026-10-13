@@ -1,0 +1,37 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CT 判讀練習｜老師說明書</title><link rel="stylesheet" href="manual.css"></head><body>
+<nav><a href="#a">三個網址</a><a href="#b">發給學生</a><a href="#c">看進度</a><a href="#d">評分與修改</a><a href="#e">學生填完後</a><a href="#f">題目與清空</a><a href="#g">注意事項</a></nav>
+<main><h1>CT 判讀練習｜老師說明書</h1><div class="sub">收件、看進度、評分、修改、把結果交給 Claude｜說明書裡的影像已模糊處理</div>
+<h2 id="a">1. 三個網址</h2><table>
+<tr><th>學生練習</th><td><code>index.html</code>（網站首頁）。發給學生的就是這個。不用 Google 帳號。</td></tr>
+<tr><th>老師總覽與評分</th><td><code>teacher.html?k=老師碼</code>。<b>老師碼只有老師有</b>（Claude 會另外給你），不要給學生。第一次打開後，這台電腦會記住老師碼。</td></tr>
+<tr><th>審閱版</th><td><code>review.html?k=老師碼</code>。不用登入、不會存檔；可以選第 1–25 組，看到的就是學生那一組的畫面，用來事先檢查題目。</td></tr></table>
+<h2 id="b">2. 發給學生</h2><div class="box">訊息範本：<br>「CT 牙齒判讀練習：請用電腦打開（網址），填學號、姓名、學校 email、年級後開始。每人 5 例，約 30–45 分鐘，會自動存檔，全部完成後下載 PDF 交給我。說明書在登入頁的連結。截止：＿月＿日。」</div>
+<p>每人分到哪一組由系統依點開順序分配（先到先分）。共 25 組；超過 25 人時，第 26 人會看到「題組已分完」。</p>
+<h2 id="c">3. 看進度：「總覽」</h2><img src="img/t1_overview.jpg" alt="老師總覽">
+<table><tr><th>每位學生</th><td>學號、姓名、email、年級、組別、已完成幾例、狀態（已領取／作答中／已完成）、最後存檔時間、驗證碼（交件後才有）。</td></tr>
+<tr><th>總報告</th><td>每個病例有幾人分到、幾人填完、各種錯誤被標了幾次、哪幾顆牙最常被標錯。<b>每次有學生存檔就自動更新</b>，頁面每 60 秒重新整理。</td></tr>
+<tr><th>評分紀錄</th><td>你評過分的學生、總分、各例分數、評語。</td></tr>
+<tr><th>試算表</th><td>同樣的資料也在雲端資料夾的試算表「總覽與總報告」（要用你的 Google 帳號開）。</td></tr></table>
+<h2 id="d">4. 評分與修改：「評分與修改」</h2><img src="img/t2a_grade.jpg" alt="評分畫面">
+<img src="img/t2_grade.jpg" alt="逐項打對錯">
+<table><tr><th>① 選學生</th><td>左邊點一位學生。</td></tr>
+<tr><th>② 逐例看</th><td>上方「第 1 例…第 5 例」切換。環景圖上紅框＝學生標錯的位置；下面有 3D 可對照。</td></tr>
+<tr><th>③ 逐項打對／錯</th><td>學生的每一個判斷（標錯的牙、說 AI 漏掉的牙、黃線紅線準不準、或「全部正確」）各按「對」或「錯」。</td></tr>
+<tr><th>④ 分數</th><td>全部打完會自動算這例分數＝對的項目 ÷ 全部項目 × 100，<b>可以直接改</b>。學生漏掉的錯寫在「這例評語」，需要的話手動扣分。</td></tr>
+<tr><th>⑤ 總分與總評語</th><td>總分預設＝5 例平均，可改。</td></tr>
+<tr><th>⑥ 儲存評分</th><td>按「儲存評分」才會存。之後可以再打開修改，按儲存就覆蓋。</td></tr>
+<tr><th>退回讓學生修改</th><td>學生已交件但要讓他改：按右上「退回讓學生修改」，學生重新登入就能改、重新交件（新的驗證碼）。</td></tr></table>
+<div class="box">你打的「對／錯」也會變成訓練資料：老師判定對的學生標記，才會拿去修正 AI。</div>
+<h2 id="e">5. 學生填完後，怎麼跟 Claude 說</h2><img src="img/t3_export.jpg" alt="下載結果">
+<table><tr><th>① 下載</th><td>「下載結果」頁按「下載全部結果」，會存一個 <code>CT學生標註結果-日期.json</code> 到 <code>C:\Users\Jethro\Downloads</code>。</td></tr>
+<tr><th>② 告訴 Claude</th><td>在 CT 對話說：「<b>學生結果下載好了</b>」（要說清楚是哪一批，例如「第一班」）。</td></tr>
+<tr><th>Claude 會做</th><td>到下載資料夾拿檔 → 換回內部病例代碼、只留學號（姓名 email 不進訓練資料）→ 存進標註庫 → 出一份報告 PDF：哪些牙位 AI 最常錯、學生之間一致不一致、你評分的分布 → 用老師判定對的標記修正 AI。</td></tr>
+<tr><th>不用等全部交</th><td>中途也可以下載，Claude 會先分析已交的。</td></tr></table>
+<h2 id="f">6. 題目與清空（通常由 Claude 做）</h2><table>
+<tr><th>上傳題目</th><td>「上傳題目」頁選 Claude 打包好的 <code>cases\S-xxx.json</code> 和 <code>sets.json</code>。Claude 打包時已做個資檢查，影像只有病例代碼。</td></tr>
+<tr><th>正式開始前</th><td>「清空所有作答與分組」會把測試時的作答、分組、評分清掉（題目保留）。學生開始後不要按。</td></tr></table>
+<h2 id="g">7. 注意事項</h2><div class="box warn">
+① 老師碼和老師網址不要給學生（拿到就能看到全部學生的姓名、email、分數）。<br>
+② 雲端資料夾「CBCT辨識考卷資料」不要分享給學生；網站是用你的身分讀寫資料，學生不需要權限。<br>
+③ 學生 PDF 只是收據；成績以總覽裡的驗證碼和你的評分為準。<br>
+④ 這個網站只有畫面，沒有任何病人資料；病例影像只存在你的雲端，要登入（學生）或老師碼才讀得到。</div></main></body></html>

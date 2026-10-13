@@ -1,0 +1,69 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CT 牙齒判讀練習｜審閱版</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link rel="stylesheet" href="exam.css">
+<script src="config.js"></script><script src="api.js"></script>
+</head><body>
+<style>.rv{position:sticky;top:0;z-index:30;background:#3b2e0b;border-bottom:1px solid #d29922;color:#fff;padding:8px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:14px}
+.rv select,.rv input{font:inherit;padding:3px 6px}.rvp{max-width:1180px;margin:12px auto;padding:0 16px}.rvp table{border-collapse:collapse;width:100%;font-size:13px;margin:8px 0}.rvp td,.rvp th{border:1px solid #2a313c;padding:4px 6px;text-align:center}.rvp th{background:#161b22}
+.rvk{max-width:520px;margin:60px auto;padding:20px;background:#161b22;border:1px solid #2a313c;border-radius:10px}</style>
+<div class="rv hide" id="rvbar"><b>審閱版（不用登入、不會存檔）</b><span>看第 <select id="rvs"></select> 組</span>
+<button class="btn" id="rvall">全部組別與病例一覽</button><a class="btn" href="manual-student.html" target="_blank">學生說明書</a><a class="btn" id="rvtm" href="manual-teacher.html" target="_blank">老師說明書（收件、評分、修改）</a><a class="btn" id="rvteach" href="teacher.html" target="_blank">老師總覽與評分</a></div>
+<div class="rvk hide" id="rvkey"><h3 style="margin-top:0">審閱版</h3><p class="mu">請輸入老師碼（老師總覽連結最後 k= 那一串）。</p><input id="kin" class="note" placeholder="老師碼"><p><button class="btn pri" id="kgo">打開</button></p></div>
+<div class="rvp hide" id="rvlist"></div>
+<div id="examwrap" class="hide">
+
+<div class="top"><h1>CT 牙齒判讀練習</h1><div class="dots" id="dots"></div><span class="sp"></span><span class="mu" id="who"></span><span class="mu" id="saved"></span>
+<button class="btn hide" id="tmp">暫存</button><button class="btn pri hide" id="pdf">全部完成：下載結果 PDF</button></div>
+<main>
+<section id="login" class="card">
+  <h2 style="margin-top:0">開始前</h2>
+  <div class="help"><b>這是什麼：</b>AI 讀了一份牙科 CBCT，標出每顆牙的號碼。請你找出 AI 標錯的地方。你的答案會用來訓練 AI，老師也會用來評分。
+  <ul><li>① 先填學號等資料。<b>關掉瀏覽器也沒關係</b>，下次用同一個學號和 email 登入就會回到你的題目和進度。</li>
+  <li>② 每例：哪顆牙號錯就點它的號碼框選錯在哪；再看黃線（骨頭外框）、紅線（神經管）準不準。</li>
+  <li>③ 每次操作都會自動存到老師的雲端資料夾，也可以隨時按「暫存」。</li>
+  <li>④ 全部填完，右上角會出現「下載結果 PDF」，下載後交給老師。</li></ul>
+  <p class="mu">完整說明書（有截圖）：<a href="manual-student.html" target="_blank">打開學生說明書</a></p></div>
+  <div class="form">
+    <label>學號 *</label><input id="sid" autocomplete="off" placeholder="例如 B1234567">
+    <label>姓名</label><input id="sname" placeholder="第一次登入必填">
+    <label>學校 email *</label><input id="email" placeholder="每次登入都要填（用來確認是你）">
+    <label>年級</label><input id="grade" placeholder="例如 大三">
+  </div>
+  <p class="mu">已經登入過的人：填學號和學校 email 就可以繼續。</p>
+  <button class="btn pri" id="go">開始／繼續</button>
+</section>
+<div id="case"></div>
+</main>
+<div class="foot hide" id="foot"><button class="btn" id="prev">← 上一例</button><button class="btn okline" id="allok">全部正確，下一例</button><button class="btn pri" id="next">這例填好了，下一例 →</button></div>
+<div class="toast" id="toast"></div>
+</div>
+<script>
+const qs=new URLSearchParams(location.search);let K=qs.get("k")||"";try{if(K)localStorage.setItem("ct-teacher-k",K);else K=localStorage.getItem("ct-teacher-k")||""}catch(e){}
+let SETS=null;const CC={};
+const RS=(()=>{const m=location.hash.match(/set=(\d+)/);return m?+m[1]:1})();
+window.BACKEND={
+  register: async()=>({sid:"審閱",tok:"",name:"審閱版",email:"-",grade:"-",set:RS,cases:SETS.sets[RS-1].cases,saved:null}),
+  getCase: async(s,id)=>CC[id]||(CC[id]=await api("tCase",K,id)),
+  save: async(s,st,f)=>({ok:true,done:Object.values(st).filter(x=>x.done).length,total:5,verify:f?"審閱版不產生驗證碼":"",at:new Date().toISOString()})
+};
+async function start(){
+  try{SETS=await api("tSets",K)}catch(e){document.getElementById("rvkey").classList.remove("hide");if(K)alertMsg(e.message);return}
+  if(!SETS||!SETS.sets){alertMsg("雲端還沒有題組");return}
+  document.getElementById("rvbar").classList.remove("hide");document.getElementById("examwrap").classList.remove("hide");
+  document.getElementById("rvteach").href="teacher.html?k="+encodeURIComponent(K);
+  const s=document.getElementById("rvs");SETS.sets.forEach(x=>{const o=document.createElement("option");o.value=x.id;o.textContent=x.id;if(x.id===RS)o.selected=true;s.appendChild(o)});
+  s.onchange=()=>{location.hash="set="+s.value;location.reload()};
+  document.getElementById("rvall").onclick=async()=>{const l=document.getElementById("rvlist");if(!l.classList.contains("hide")){l.classList.add("hide");return}
+    const use={};SETS.sets.forEach(st=>st.cases.forEach(c=>(use[c]=use[c]||[]).push(st.id)));
+    let h='<h2>'+SETS.sets.length+' 組題目分配</h2><table><tr><th>組別</th><th>5 個病例</th><th></th></tr>'+SETS.sets.map(x=>'<tr><td>第 '+x.id+' 組</td><td>'+x.cases.join("、")+'</td><td><a href="#set='+x.id+'" onclick="setTimeout(()=>location.reload(),10)">打開這組</a></td></tr>').join("")+'</table>';
+    h+='<h2>病例一覽（'+Object.keys(use).length+' 例）</h2><table><tr><th>病例</th><th>出現在哪幾組</th><th>AI 說明（學生會看到）</th></tr>';
+    l.innerHTML=h+'<tr><td colspan=3>讀取中…</td></tr></table>';l.classList.remove("hide");l.scrollIntoView();
+    const ids=Object.keys(use).sort();const rows=[];for(const c of ids){const d=await BACKEND.getCase("",c);rows.push('<tr><td>'+c+'</td><td>'+use[c].join("、")+'</td><td style="text-align:left">'+(d.ai_note||"")+'</td></tr>')}
+    l.innerHTML=h+rows.join("")+'</table>'};
+  document.getElementById("sid").value="review";document.getElementById("email").value="-";document.getElementById("go").click();
+}
+function alertMsg(t){const e=document.getElementById("toast");e.textContent=t;e.style.display="block";setTimeout(()=>e.style.display="none",4000)}
+document.getElementById("kgo").onclick=()=>{K=document.getElementById("kin").value.trim();try{localStorage.setItem("ct-teacher-k",K)}catch(e){};location.search="?k="+encodeURIComponent(K)};
+</script>
+<script src="exam.js"></script><script>start()</script></body></html>
