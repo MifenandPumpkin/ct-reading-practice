@@ -43,8 +43,11 @@
         const thr = o.jaw === 1 ? ys[Math.floor(ys.length * 0.15)] : ys[Math.floor(ys.length * 0.85)];
         let sx = 0, sy = 0, sz = 0, n = 0; for (let i = 0; i < p.length; i += 3) { const y = p[i + 1]; if (o.jaw === 1 ? y <= thr : y >= thr) { sx += p[i]; sy += y; sz += p[i + 2]; n++; } }
         if (n) anchor.set(sx / n, sy / n, sz / n);
+        const thr2 = o.jaw === 1 ? ys[Math.floor(ys.length * 0.95)] : ys[Math.floor(ys.length * 0.05)]; let ax = 0, ay = 0, az = 0, m2 = 0;
+        for (let i = 0; i < p.length; i += 3) { const y = p[i + 1]; if (o.jaw === 1 ? y >= thr2 : y <= thr2) { ax += p[i]; ay += y; az += p[i + 2]; m2++; } }
+        var apex = m2 ? new THREE.Vector3(ax / m2, ay / m2, az / m2) : c.clone();
       }
-      R.model.add(m); R.objs.push({ o, m, c, anchor });
+      R.model.add(m); R.objs.push({ o, m, c, anchor, apex: (o.k === "t" ? apex : c) });
     }
     // 牙弓中心（畫引線往外推的方向用）
     const t = R.objs.filter(x => x.o.k === "t"); const ac = new THREE.Vector3(); t.forEach(x => ac.add(x.c)); if (t.length) ac.divideScalar(t.length); R.arch = ac;
@@ -78,7 +81,7 @@
     layout(); const box = new THREE.Box3(), add = x => { const b = x.m.geometry.boundingBox.clone(); b.translate(x.m.position); box.union(b); };
     R.objs.forEach(x => { if (x.m.visible && x.o.k === "t") add(x); }); if (box.isEmpty()) R.objs.forEach(x => { if (x.m.visible) add(x); });
     const s = new THREE.Vector3(); box.getSize(s); const c = new THREE.Vector3(); box.getCenter(c);
-    R.center = c; R.dist = Math.max(60, Math.max(s.x, s.y, s.z) * 2.4);
+    R.center = c; R.dist = Math.max(60, Math.max(s.x, s.y, s.z) * (R.jaw === 0 ? 2.8 : 2.5));
   }
   function draw() {
     if (!R) return; const st = R.el.querySelector(".v3stage"), w = st.clientWidth, h = st.clientHeight; if (!w || !h) return;
@@ -94,26 +97,35 @@
   function labels(w, h) {
     const box = R.el.querySelector(".v3labs"), svg = R.el.querySelector(".v3lines"); svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
     if (!R.lab) { box.innerHTML = ""; svg.innerHTML = ""; return; }
-    const L = [];
-    const ac = R.arch.clone(); const acs = R.model.localToWorld(ac.clone()).project(R.cam); const ax = (acs.x + 1) / 2 * w, ay = (1 - acs.y) / 2 * h;
-    for (const x of R.objs) {
-      if (x.o.k !== "t" || !x.m.visible) continue;
-      const a = x.anchor.clone(); a.y += x.off || 0; const s = R.model.localToWorld(a).project(R.cam);
-      if (s.z > 1) continue; const px = (s.x + 1) / 2 * w, py = (1 - s.y) / 2 * h;
-      let dx = px - ax, dy = py - ay; const n = Math.hypot(dx, dy) || 1; dx /= n; dy /= n;
-      if (R.jaw === 0) { dy = x.o.jaw === 1 ? -Math.abs(dy) - 0.6 : Math.abs(dy) + 0.6; const m = Math.hypot(dx, dy); dx /= m; dy /= m; }
-      L.push({ f: x.o.fdi, px, py, dx, dy, lx: px + dx * 34, ly: py + dy * 34 });
-    }
-    // 不重疊：反覆把重疊的標籤沿各自外推方向推開
-    const W = 26, H = 18;
-    for (let it = 0; it < 60; it++) {
-      let moved = false;
-      for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
-        const a = L[i], b = L[j]; const ox = W - Math.abs(a.lx - b.lx), oy = H - Math.abs(a.ly - b.ly);
-        if (ox > 0 && oy > 0) { moved = true; const k = 0.5 + Math.min(ox, oy) * 0.15; a.lx += a.dx * k * 2; a.ly += a.dy * k * 2; b.lx += b.dx * k * 2; b.ly += b.dy * k * 2;
-          const sx = Math.sign(a.lx - b.lx) || 1; a.lx += sx * 1.2; b.lx -= sx * 1.2; }
+    const W = 26, H = 18, G = 3, L = [];
+    const proj = v => { const s = R.model.localToWorld(v).project(R.cam); return { x: (s.x + 1) / 2 * w, y: (1 - s.y) / 2 * h, z: s.z }; };
+    if (R.view === "occ" || Math.abs(camDirModel().y) > 0.55) { // 咬合面（或從上下方斜看）：沿牙弓往外推（放射狀）
+      const ac = proj(R.arch.clone());
+      for (const x of R.objs) { if (x.o.k !== "t" || !x.m.visible) continue; const a = x.anchor.clone(); a.y += x.off || 0; const s = proj(a); if (s.z > 1) continue;
+        let dx = s.x - ac.x, dy = s.y - ac.y; const n = Math.hypot(dx, dy) || 1; dx /= n; dy /= n; L.push({ f: x.o.fdi, px: s.x, py: s.y, dx, dy, lx: s.x + dx * 30, ly: s.y + dy * 30 }); }
+      for (let it = 0; it < 80; it++) { let moved = false;
+        for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) { const a = L[i], b = L[j], ox = W + G - Math.abs(a.lx - b.lx), oy = H + G - Math.abs(a.ly - b.ly);
+          if (ox > 0 && oy > 0) { moved = true; a.lx += a.dx * 2; a.ly += a.dy * 2; b.lx += b.dx * 2; b.ly += b.dy * 2; } }
+        if (!moved) break; }
+    } else { // 正面／側面／自由角度：上顎一排標在牙根上方、下顎一排在牙根下方，左右排開不重疊、引線不交錯
+      for (const jaw of [1, 2]) {
+        const T = [];
+        for (const x of R.objs) { if (x.o.k !== "t" || !x.m.visible || x.o.jaw !== jaw) continue;
+          const a = x.apex.clone(); a.y += x.off || 0; const s = proj(a); if (s.z > 1) continue; T.push({ f: x.o.fdi, px: s.x, py: s.y }); }
+        if (!T.length) continue;
+        const rowY = jaw === 1 ? Math.min(...T.map(t => t.py)) - 22 : Math.max(...T.map(t => t.py)) + 22;
+        // 照牙弓順序排（18→11→21→28／48→41→31→38），畫面方向由實際位置決定；排在牙齒範圍的正上／下方
+        const key = f => { const q = Math.floor(f / 10), n = f % 10; return (q === 1 || q === 4) ? -n : n; };
+        T.sort((a, b) => key(a.f) - key(b.f));
+        const half = Math.floor(T.length / 2), m1 = T.slice(0, Math.max(1, half)).reduce((s, t) => s + t.px, 0) / Math.max(1, half), m2 = T.slice(half).reduce((s, t) => s + t.px, 0) / Math.max(1, T.length - half);
+        if (m1 > m2) T.reverse();
+        const lo = Math.min(...T.map(t => t.px)), hi = Math.max(...T.map(t => t.px)), need = T.length * (W + G) - G;
+        const span = Math.max(need, hi - lo), start = (lo + hi) / 2 - span / 2 + W / 2, stp = T.length > 1 ? (span - W) / (T.length - 1) : 0;
+        T.forEach((t, i) => t.lx = start + i * Math.max(W + G, stp));
+        const over = T[T.length - 1].lx - (w - W / 2); if (over > 0) T.forEach(t => t.lx -= over);  // 超出右邊整排左移
+        const lack = W / 2 - T[0].lx; if (lack > 0) T.forEach(t => t.lx += lack);
+        T.forEach(t => L.push({ f: t.f, px: t.px, py: t.py, lx: t.lx, ly: Math.max(H / 2, Math.min(h - H / 2, rowY)) }));
       }
-      if (!moved) break;
     }
     L.forEach(l => { l.lx = Math.max(W / 2, Math.min(w - W / 2, l.lx)); l.ly = Math.max(H / 2, Math.min(h - H / 2, l.ly)); });
     svg.innerHTML = L.map(l => `<line x1="${l.px.toFixed(1)}" y1="${l.py.toFixed(1)}" x2="${l.lx.toFixed(1)}" y2="${l.ly.toFixed(1)}"/><circle cx="${l.px.toFixed(1)}" cy="${l.py.toFixed(1)}" r="2"/>`).join("");
