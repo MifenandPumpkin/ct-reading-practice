@@ -43,7 +43,8 @@ async function render(){const id=CASES[cur];const el=document.getElementById("ca
   <div class="q"><div class="g"><span>黃線（骨頭外框）</span><button class="btn yes ${s.bone==="ok"?"on":""}" data-k="bone" data-v="ok">準</button><button class="btn no ${s.bone==="bad"?"on":""}" data-k="bone" data-v="bad">不準</button></div>
   <div class="g"><span>紅線（神經管）</span><button class="btn yes ${s.canal==="ok"?"on":""}" data-k="canal" data-v="ok">準</button><button class="btn no ${s.canal==="bad"?"on":""}" data-k="canal" data-v="bad">不準</button></div></div>
   <input class="note" id="note" placeholder="想補充的話寫這裡（可不填）">
-  <details open style="margin-top:10px"><summary class="mu">3D（右側／正面／左側；點圖可放大）</summary><div class="v3"><img src="data:image/png;base64,${c.views.right}"><img src="data:image/png;base64,${c.views.front}"><img src="data:image/png;base64,${c.views.left}"></div></details></div>`;
+  <div class="step"><span class="no">③</span><div><div class="tt">3D：可以轉、可以縮放，對照上面的牙號</div><div class="sub">預設只看上顎；「上下都看」會把上下顎分開。側面只畫靠近你那一側的牙。骨頭是半透明，可以關掉。</div></div></div>
+  <div id="v3h">${c.mesh?"":`<div class="v3"><img src="data:image/png;base64,${c.views.right}"><img src="data:image/png;base64,${c.views.front}"><img src="data:image/png;base64,${c.views.left}"></div>`}</div></div>`;
   document.getElementById("note").value=s.note||"";document.getElementById("missno").value=keepMiss;
   el.querySelectorAll(".chip").forEach(b=>b.onclick=ev=>{ev.stopPropagation();openMenu(b,+b.dataset.f)});
   el.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{delete s.errors[b.dataset.del];markDirty();render()});
@@ -52,7 +53,8 @@ async function render(){const id=CASES[cur];const el=document.getElementById("ca
   document.getElementById("note").oninput=e=>{s.note=e.target.value;markDirty()};
   document.getElementById("addmiss").onclick=()=>{const v=missno.value.trim();if(FDI(v)){if(!s.missing.includes(+v))s.missing.push(+v);markDirty();render()}else toast("請先在左邊格子填 AI 漏掉的牙號（11–48，例如 31）")};
   document.getElementById("missno").onkeydown=e=>{if(e.key==="Enter")addmiss.click()};
-  document.getElementById("prev").disabled=cur===0;}
+  document.getElementById("prev").disabled=cur===0;
+  if(c.mesh){try{if(!window.V3||!window.THREE)throw new Error("3D 元件沒有載入");V3.mount(document.getElementById("v3h"),id,c.mesh)}catch(e){console.error(e);document.getElementById("v3h").innerHTML='<div class="mu">3D 暫時打不開（'+(e.message||e)+'）。牙號請看上面的全景圖。</div>'}}}
 function closeMenu(){if(menuEl){menuEl.remove();menuEl=null}}
 document.addEventListener("click",e=>{if(menuEl&&!menuEl.contains(e.target))closeMenu()});document.addEventListener("keydown",e=>{if(e.key==="Escape")closeMenu()});
 function openMenu(btn,f){closeMenu();const id=CASES[cur],c=cache[id],s=S(id);const me=c.labels.find(l=>l.fdi===f);
