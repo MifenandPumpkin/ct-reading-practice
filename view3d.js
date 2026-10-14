@@ -1,5 +1,5 @@
 // 3D 檢視（可轉、可縮放）：牙齒實色、骨頭半透明可開關、上下顎分開、側面只畫靠近那一側、牙號引線不重疊。
-// 滑鼠（全系統統一，照 Slicer）：右鍵拖曳＝旋轉（自由、不鎖方向、放開不滑動）、中鍵拖曳＝平移、滾輪＝縮放。
+// 滑鼠（全系統統一，照 Slicer）：右鍵拖曳＝旋轉（自由、不鎖方向、放開不滑動）、中鍵拖曳＝平移、滾輪＝往游標位置縮放。
 // 筆電觸控板：左鍵拖曳也可旋轉，Shift＋左鍵拖曳＝平移。手機：單指旋轉、雙指縮放。
 // 需要 three.js r128（全域 THREE）。資料：case.mesh = {unit, objs:[{k:'t'|'b'|'c', fdi, jaw, v:b64 int16, f:b64 uint16}]}
 (function () {
@@ -13,7 +13,7 @@
       <span class="grp"><button data-view="front">正面</button><button data-view="right">右側</button><button data-view="left">左側</button><button data-view="occ">咬合面</button></span>
       <label class="chk"><input type="checkbox" data-bone checked> 骨頭（半透明）</label>
       <label class="chk"><input type="checkbox" data-lab checked> 牙號</label>
-      <span class="hint">右鍵拖曳旋轉・中鍵拖曳平移・滾輪縮放</span></div>
+      <span class="hint">右鍵拖曳旋轉・中鍵拖曳平移・滾輪往游標縮放</span></div>
       <div class="v3stage"><canvas></canvas><svg class="v3lines"></svg><div class="v3labs"></div></div>`;
     const cv = el.querySelector("canvas"), renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: false });
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); renderer.setClearColor(0x0d1117);
@@ -140,7 +140,10 @@
     st.addEventListener("pointermove", e => { if (!mode) return; const dx = e.clientX - lx, dy = e.clientY - ly; lx = e.clientX; ly = e.clientY;
       if (mode === "rot") rotate(dx, dy); else { const k = R.dist / st.clientHeight * 0.55; R.pan.x -= dx * k; R.pan.y += dy * k; draw(); } });
     const up = () => { mode = null; }; st.addEventListener("pointerup", up); st.addEventListener("pointercancel", up);
-    st.addEventListener("wheel", e => { e.preventDefault(); R.dist *= Math.exp(Math.sign(e.deltaY) * 0.12); R.dist = Math.max(25, Math.min(900, R.dist)); draw(); }, { passive: false });
+    st.addEventListener("wheel", e => { e.preventDefault(); // 往游標位置縮放（全系統統一，Jethro 10-14 決定，同 3Shape）
+      const r = st.getBoundingClientRect(), nx = (e.clientX - r.left) / r.width * 2 - 1, ny = 1 - (e.clientY - r.top) / r.height * 2;
+      const old = R.dist; R.dist = Math.max(25, Math.min(900, R.dist * Math.exp(Math.sign(e.deltaY) * 0.12))); const k = R.dist / old;
+      const t = Math.tan(R.cam.fov * Math.PI / 360) * old; R.pan.x += (1 - k) * nx * t * R.cam.aspect; R.pan.y += (1 - k) * ny * t; draw(); }, { passive: false });
     st.addEventListener("touchmove", e => { if (e.touches.length === 2) { e.preventDefault(); const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); if (pinch) { R.dist *= pinch / d; R.dist = Math.max(25, Math.min(900, R.dist)); draw(); } pinch = d; mode = null; } }, { passive: false });
     st.addEventListener("touchend", () => { pinch = 0; });
   }
