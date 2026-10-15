@@ -1,10 +1,66 @@
 // 3D 檢視（可轉、可縮放）：牙齒實色、骨頭半透明可開關、上下顎分開、側面只畫靠近那一側、牙號引線不重疊。
 // 滑鼠（全系統統一，照 Slicer）：右鍵拖曳＝旋轉（自由、不鎖方向、放開不滑動）、中鍵拖曳＝平移、滾輪＝往游標位置縮放。
 // 筆電觸控板：左鍵拖曳也可旋轉，Shift＋左鍵拖曳＝平移。手機：單指旋轉、雙指縮放。
-// 需要 three.js r128（全域 THREE）。資料：case.mesh = {unit, objs:[{k:'t'|'b'|'c', fdi, jaw, v:b64 int16, f:b64 uint16}]}
+// 骨頭閾值滑桿：case.mesh.vol（每顎一份降採樣 CT，uint8＝(HU-lo)/sc，0＝範圍外）存在時出現；在瀏覽器裡用表面網重建骨面，預設＝原本的骨面。
+// 需要 three.js r128（全域 THREE）。資料：case.mesh = {unit, objs:[{k:'t'|'b'|'c', fdi, jaw, v:b64 int16, f:b64 uint16}], vol?:[{jaw,o,sv,n,lo,sc,d,rle,q}]}
 (function () {
-  const PAL = [0xf0a050, 0x55c8e6], BONE = 0xe8dcc0, CANAL = 0xe04848, OPEN_MM = 9;
+  const PAL = [0xf0a050, 0x55c8e6], BONE = 0xe8dcc0, CANAL = 0xe04848, OPEN_MM = 9, THR_MIN_HU = 150; // 低於這個 HU 會把軟組織一起長成方盒（10-15 自評）
   let R = null; // 單一 renderer，重複使用
+  // 表面網（surface nets）：在 uint8 體積上找 iso 等值面，每個跨越的格子放一個頂點（12 條邊交點平均），每條跨越的邊出一個四邊形。
+  // q：x 最快、再 y、再 z；回傳格點座標（體素單位）的頂點與三角形索引。
+  function snets(q, nx, ny, nz, iso) {
+    const cx = nx - 1, cy = ny - 1, cz = nz - 1, cid = new Int32Array(cx * cy * cz).fill(-1);
+    const P = [], sxy = nx * ny;
+    const E = [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]];
+    const CO = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]];
+    const g = new Float32Array(8);
+    let nv = 0;
+    for (let k = 0; k < cz; k++) for (let j = 0; j < cy; j++) {
+      const row = k * sxy + j * nx;
+      for (let i = 0; i < cx; i++) {
+        const b = row + i;
+        g[0] = q[b]; g[1] = q[b + 1]; g[2] = q[b + nx]; g[3] = q[b + nx + 1];
+        g[4] = q[b + sxy]; g[5] = q[b + sxy + 1]; g[6] = q[b + sxy + nx]; g[7] = q[b + sxy + nx + 1];
+        let m = 0; for (let c = 0; c < 8; c++) if (g[c] >= iso) m |= 1 << c;
+        if (m === 0 || m === 255) continue;
+        let sx = 0, sy = 0, sz = 0, n = 0;
+        for (let e = 0; e < 12; e++) {
+          const a = E[e][0], c = E[e][1], ia = (m >> a) & 1, ic = (m >> c) & 1; if (ia === ic) continue;
+          const t = (iso - g[a]) / (g[c] - g[a]), A = CO[a], C = CO[c];
+          sx += A[0] + t * (C[0] - A[0]); sy += A[1] + t * (C[1] - A[1]); sz += A[2] + t * (C[2] - A[2]); n++;
+        }
+        cid[(k * cy + j) * cx + i] = nv++; P.push(i + sx / n, j + sy / n, k + sz / n);
+      }
+    }
+    const F = [], C = (i, j, k) => cid[(k * cy + j) * cx + i];
+    const quad = (a, b, c, d, flip) => { if (a < 0 || b < 0 || c < 0 || d < 0) return; if (flip) F.push(a, c, b, a, d, c); else F.push(a, b, c, a, c, d); };
+    for (let k = 1; k < cz; k++) for (let j = 1; j < cy; j++) {
+      const row = k * sxy + j * nx;
+      for (let i = 1; i < cx; i++) {
+        const v0 = q[row + i] >= iso;
+        if (v0 !== (q[row + i + 1] >= iso)) quad(C(i, j - 1, k - 1), C(i, j, k - 1), C(i, j, k), C(i, j - 1, k), !v0);
+        if (v0 !== (q[row + i + nx] >= iso)) quad(C(i - 1, j, k - 1), C(i - 1, j, k), C(i, j, k), C(i, j, k - 1), !v0);
+        if (v0 !== (q[row + i + sxy] >= iso)) quad(C(i - 1, j - 1, k), C(i, j - 1, k), C(i, j, k), C(i - 1, j, k), !v0);
+      }
+    }
+    return { p: new Float32Array(P), f: new Uint32Array(F) };
+  }
+  function smooth(p, f, it) { // 鄰點平均（每條邊雙向），讓表面網的階梯變平順
+    const n = p.length / 3, s = new Float32Array(p.length), c = new Uint16Array(n);
+    for (let t = 0; t < it; t++) {
+      s.fill(0); c.fill(0);
+      for (let i = 0; i < f.length; i += 3) for (let e = 0; e < 3; e++) { const a = f[i + e], b = f[i + (e + 1) % 3];
+        s[a * 3] += p[b * 3]; s[a * 3 + 1] += p[b * 3 + 1]; s[a * 3 + 2] += p[b * 3 + 2]; c[a]++;
+        s[b * 3] += p[a * 3]; s[b * 3 + 1] += p[a * 3 + 1]; s[b * 3 + 2] += p[a * 3 + 2]; c[b]++; }
+      for (let i = 0; i < n; i++) if (c[i]) { const k = 0.5 / c[i]; p[i * 3] = p[i * 3] * 0.5 + s[i * 3] * k; p[i * 3 + 1] = p[i * 3 + 1] * 0.5 + s[i * 3 + 1] * k; p[i * 3 + 2] = p[i * 3 + 2] * 0.5 + s[i * 3 + 2] * k; }
+    }
+  }
+  function unrle(b) { // 0, n = n 個 0
+    let n = 0; for (let i = 0; i < b.length; i++) { if (b[i] === 0) { n += b[i + 1]; i++; } else n++; }
+    const o = new Uint8Array(n); let p = 0;
+    for (let i = 0; i < b.length; i++) { if (b[i] === 0) { p += b[i + 1]; i++; } else o[p++] = b[i]; }
+    return o;
+  }
   function b64(s, T) { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return new T(u.buffer); }
   function make() {
     const el = document.createElement("div"); el.className = "v3d";
@@ -12,6 +68,7 @@
       <span class="grp"><button data-jaw="1">上顎</button><button data-jaw="2">下顎</button><button data-jaw="0">上下都看</button></span>
       <span class="grp"><button data-view="front">正面</button><button data-view="right">右側</button><button data-view="left">左側</button><button data-view="occ">咬合面</button></span>
       <label class="chk"><input type="checkbox" data-bone checked> 骨頭（半透明）</label>
+      <span class="thr" hidden>骨頭閾值 <input type="range" data-thr min="-400" max="900" step="10" value="0"><b data-thrv></b><button data-thr0>還原</button></span>
       <label class="chk"><input type="checkbox" data-lab checked> 牙號</label>
       <span class="hint">右鍵拖曳旋轉・中鍵拖曳平移・滾輪往游標縮放</span></div>
       <div class="v3stage"><canvas></canvas><svg class="v3lines"></svg><div class="v3labs"></div></div>`;
@@ -51,7 +108,29 @@
     }
     // 牙弓中心（畫引線往外推的方向用）
     const t = R.objs.filter(x => x.o.k === "t"); const ac = new THREE.Vector3(); t.forEach(x => ac.add(x.c)); if (t.length) ac.divideScalar(t.length); R.arch = ac;
-    R.objs.forEach(x => { x.base = x.m.position.clone(); });
+    R.objs.forEach(x => { x.base = x.m.position.clone(); x.g0 = x.m.geometry; });
+    R.vol = {}; R.delta = { 1: 0, 2: 0 };
+    for (const v of mesh.vol || []) { const raw = b64(v.q, Uint8Array); R.vol[v.jaw] = Object.assign({}, v, { q: v.rle ? unrle(raw) : raw }); }
+    thrUI();
+  }
+  function rebuildBone(jaw) { // 依閾值重建這一顎的骨面；差值 0 用原本的平滑骨面
+    const x = R.objs.find(y => y.o.k === "b" && y.o.jaw === jaw), v = R.vol[jaw]; if (!x || !v) return;
+    if (x.m.geometry !== x.g0) x.m.geometry.dispose();
+    if (!R.delta[jaw]) { x.m.geometry = x.g0; return; }
+    const iso = Math.max(1.5, (v.d + R.delta[jaw] - v.lo) / v.sc), r = snets(v.q, v.n[0], v.n[1], v.n[2], iso), p = r.p;
+    smooth(p, r.f, 2);
+    for (let i = 0; i < p.length; i += 3) { const X = v.o[0] + p[i] * v.sv[0], Y = v.o[1] + p[i + 1] * v.sv[1], Z = v.o[2] + p[i + 2] * v.sv[2]; p[i] = X; p[i + 1] = Z; p[i + 2] = -Y; } // LPS -> 畫面（同 load）
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(p, 3)); g.setIndex(new THREE.BufferAttribute(r.f, 1));
+    g.computeVertexNormals(); g.computeBoundingBox(); x.m.geometry = g;
+  }
+  function thrJaws() { return R.jaw === 0 ? [1, 2] : [R.jaw]; }
+  function thrUI() { // 滑桿顯示目前看的那一顎（上下都看時兩顎一起動）
+    const box = R.el.querySelector(".thr"), has = Object.keys(R.vol).length > 0; box.hidden = !(has && R.bone); if (!has) return;
+    const js = thrJaws().filter(j => R.vol[j]); if (!js.length) { box.hidden = true; return; }
+    const sl = R.el.querySelector("[data-thr]"), dmin = Math.min(...js.map(j => R.vol[j].d));
+    sl.min = Math.max(-400, Math.ceil((THR_MIN_HU - dmin) / 10) * 10);   // 絕對值不低於 THR_MIN_HU
+    sl.value = R.delta[js[0]];
+    R.el.querySelector("[data-thrv]").textContent = js.map(j => (js.length > 1 ? (j === 1 ? "上 " : "下 ") : "") + (R.vol[j].d + R.delta[j]) + " HU").join("／");
   }
   function layout() {
     for (const x of R.objs) {
@@ -133,12 +212,16 @@
   }
   function bindUI() {
     const el = R.el;
-    el.querySelectorAll("[data-jaw]").forEach(b => b.onclick = () => { R.jaw = +b.dataset.jaw; mark(); layout(); fit(); setView(R.view === "occ" ? "occ" : R.view); });
+    el.querySelectorAll("[data-jaw]").forEach(b => b.onclick = () => { R.jaw = +b.dataset.jaw; mark(); thrUI(); layout(); fit(); setView(R.view === "occ" ? "occ" : R.view); });
     el.querySelectorAll("[data-view]").forEach(b => b.onclick = () => { setView(b.dataset.view); mark(); });
-    el.querySelector("[data-bone]").onchange = e => { R.bone = e.target.checked; draw(); };
+    el.querySelector("[data-bone]").onchange = e => { R.bone = e.target.checked; thrUI(); draw(); };
+    let pend = false;
+    const setThr = d => { for (const j of thrJaws()) if (R.vol[j] && R.delta[j] !== d) { R.delta[j] = d; rebuildBone(j); } thrUI(); draw(); };
+    el.querySelector("[data-thr]").oninput = e => { const d = +e.target.value; if (pend) return; pend = true; requestAnimationFrame(() => { pend = false; setThr(+el.querySelector("[data-thr]").value); }); };
+    el.querySelector("[data-thr0]").onclick = () => setThr(0);
     el.querySelector("[data-lab]").onchange = e => { R.lab = e.target.checked; draw(); };
   }
-  function mark() { R.el.querySelectorAll("[data-jaw]").forEach(b => b.classList.toggle("on", +b.dataset.jaw === R.jaw)); R.el.querySelectorAll("[data-view]").forEach(b => b.classList.toggle("on", b.dataset.view === R.view)); }
+  function mark() { R.el.querySelectorAll("[data-jaw]").forEach(b => { b.classList.toggle("on", +b.dataset.jaw === R.jaw); const j = +b.dataset.jaw; b.disabled = j > 0 && !R.objs.some(x => x.o.k === "t" && x.o.jaw === j); b.title = b.disabled ? "這一例的影像沒有拍到這一顎的牙" : ""; }); R.el.querySelectorAll("[data-view]").forEach(b => b.classList.toggle("on", b.dataset.view === R.view)); }
   function rotate(dx, dy) { // 自由旋轉（trackball）：拖曳方向的垂直軸，以畫面座標
     const ang = Math.hypot(dx, dy) * 0.008; if (!ang) return;
     const axis = new THREE.Vector3(dy, dx, 0).normalize(); const q = new THREE.Quaternion().setFromAxisAngle(axis, ang);
@@ -164,7 +247,7 @@
       if (!window.THREE || !mesh) { holder.innerHTML = '<div class="mu">這一例沒有 3D 資料。</div>'; return; }
       if (!R) make();
       holder.appendChild(R.el);
-      if (R.caseId !== caseId) { R.caseId = caseId; load(mesh); R.jaw = 1; R.bone = true; R.el.querySelector("[data-bone]").checked = true; layout(); fit(); setView("front"); mark(); }
+      if (R.caseId !== caseId) { R.caseId = caseId; load(mesh); R.jaw = 1; R.bone = true; R.el.querySelector("[data-bone]").checked = true; thrUI(); layout(); fit(); setView("front"); mark(); }
       else draw();
     }
   };
